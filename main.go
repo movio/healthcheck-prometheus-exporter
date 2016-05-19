@@ -27,13 +27,16 @@ func main() {
 		}
 	}
 
-	ticker := time.NewTicker(time.Second * 10)
+	// Perform initial update
+	log.Println("Updating gauges at", time.Now())
+	updateAll(hcGauges)
+
+	// Update all guages previously
+	ticker := time.Tick(time.Second * 30)
 	go func() {
-		for t := range ticker.C {
-			log.Println("Updating gauges at", t)
-			for _, guage := range hcGauges {
-				guage.update()
-			}
+		for now := range ticker {
+			log.Println("Updating gauges at", now)
+			updateAll(hcGauges)
 		}
 	}()
 

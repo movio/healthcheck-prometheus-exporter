@@ -21,6 +21,7 @@ type Tenant struct {
 type ConfigService struct {
 	Type string
 	Name string
+	Vkey string
 	Help string
 }
 

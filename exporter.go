@@ -20,17 +20,18 @@ type HcGauge struct {
 }
 
 type HcService struct {
+	Key   string
 	Name  string
 	Type  string
-	Vkey  string
+	Attr  string
 	Gauge prometheus.Gauge
 }
 
-func newGauge(tenant string, service ConfigService) prometheus.Gauge {
+func newGauge(key string, tenant string, service ConfigService) prometheus.Gauge {
 	return prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: service.Type,
 		Subsystem: tenant,
-		Name:      strings.Replace(service.Name, "-", "_", -1),
+		Name:      key,
 		Help:      service.Help,
 	})
 }
@@ -43,12 +44,25 @@ func newHcGauge(tenant Tenant, config Config) HcGauge {
 
 	services := map[string]HcService{}
 	for _, svc := range config.Services {
-		services[svc.Name] = HcService{
-			svc.Name, svc.Type, svc.Vkey, newGauge(tenant.Name, svc),
+
+		attrSet := map[string]bool{}
+		attrSet["check"] = true
+		for _, attr := range svc.Attr {
+			attrSet[attr] = true
+		}
+
+		for attr, _ := range attrSet {
+			newSvc := newService(svc, attr, tenant.Name)
+			services[newSvc.Key] = newSvc
 		}
 	}
 
 	return HcGauge{tenant.Name, urls, services}
+}
+
+func newService(svc ConfigService, attr string, tenant string) HcService {
+	key := strings.Replace(fmt.Sprintf("%s_%s", svc.Name, attr), "-", "_", -1)
+	return HcService{key, svc.Name, svc.Type, attr, newGauge(key, tenant, svc)}
 }
 
 func updateAll(hcs []HcGauge) {
@@ -61,18 +75,21 @@ func (hc HcGauge) update() {
 	for hostType, url := range hc.URLs {
 		resp, err := http.Get(url)
 		if err != nil {
-			log.Fatal("Failed to request "+url, err)
+			log.Println("Failed to request "+url, err)
+			return
 		}
 		defer resp.Body.Close()
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatal("Failed to read response body: ", err)
+			log.Println("Failed to read response body: ", err)
+			return
 		}
 
 		parsed, err := parse(body)
 		if err != nil {
-			log.Fatal("Failed to parse XML response: ", err)
+			log.Println("Failed to parse XML response: ", err)
+			return
 		}
 
 		for _, svc := range hc.Services {
@@ -81,30 +98,40 @@ func (hc HcGauge) update() {
 			}
 
 			result := parsed.findResult(svc.Name)
+			value, err := getUpdateValue(svc.Name, svc.Attr, result, body)
 
-			var value float64 = 0
-			if svc.Vkey == "" {
-				// NOTE: We consider a service failed on health check only if it
-				//       returns check="fail" in response, so that we can omit those
-				//       services whose returns empty in `check` attribute.
-				if result.Check == "fail" {
-					value = 1
-				}
-			} else {
-				val, err := findAttribute(body, svc.Name, svc.Vkey)
-				if err != nil {
-					log.Fatal("Failed to read attribute: ", err)
-				}
-
-				value, err = strconv.ParseFloat(val, 10)
-				if err != nil {
-					log.Fatal("Failed to parse attribute to integer: ", err)
-				}
+			if err != nil {
+				log.Println("Failed to read updated value: ", err)
+				continue
 			}
 
 			svc.Gauge.Set(value)
 		}
 	}
+}
+
+func getUpdateValue(svcName string, svcAttr string, result XmlService, body []byte) (float64, error) {
+	var value float64 = 0
+	switch svcAttr {
+	case "check":
+		// NOTE: We consider a service failed on health check only if it
+		//       returns check="fail" in response, so that we can omit those
+		//       services whose returns empty in `check` attribute.
+		if result.Check == "fail" {
+			value = 1
+		}
+	default:
+		val, err := findAttribute(body, svcName, svcAttr)
+		if err != nil {
+			return 0, fmt.Errorf("Failed to read attribute: %s", err)
+		}
+
+		value, err = strconv.ParseFloat(val, 10)
+		if err != nil {
+			return 0, fmt.Errorf("Failed to parse attribute to integer: %s", err)
+		}
+	}
+	return value, nil
 }
 
 func findAttribute(source []byte, svcName string, attrName string) (string, error) {

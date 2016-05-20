@@ -110,37 +110,39 @@ func (hc HcGauge) update() {
 	}
 }
 
-func getUpdateValue(svcName string, svcAttr string, result XmlService, body []byte) (float64, error) {
+func getUpdateValue(svcName string, attrName string, result XmlService, body []byte) (float64, error) {
 	var value float64 = 0
-	switch svcAttr {
-	case "check":
-		// NOTE: We consider a service failed on health check only if it
-		//       returns check="fail" in response, so that we can omit those
-		//       services whose returns empty in `check` attribute.
-		if result.Check == "fail" {
-			value = 1
-		}
-	default:
-		val, err := findAttribute(body, svcName, svcAttr)
-		if err != nil {
-			return 0, fmt.Errorf("Failed to read attribute: %s", err)
-		}
+	attrVal, err := findAttribute(body, svcName, attrName)
+	if err != nil {
+		return 0, fmt.Errorf("Failed to read attribute: %s", err)
+	}
 
-		value, err = strconv.ParseFloat(val, 10)
+	switch strings.Trim(attrVal, " ") {
+	case "pass":
+		value = 0
+	case "fail":
+		value = 1
+	case "":
+		return 0, fmt.Errorf(
+			"No value found for attribute [%s]: %s", attrName, attrVal)
+	default:
+		value, err = strconv.ParseFloat(attrVal, 10)
 		if err != nil {
-			return 0, fmt.Errorf("Failed to parse attribute to integer: %s", err)
+			return 0, fmt.Errorf(
+				"Failed to parse attribute [%s] value [%s] to integer: %s", attrName, attrVal, err)
 		}
 	}
+
 	return value, nil
 }
 
 func findAttribute(source []byte, svcName string, attrName string) (string, error) {
-	r := regexp.MustCompile(fmt.Sprintf(`%s .* %s="([0-9]+(\\.[0-9]+)?)"`, svcName, attrName))
+	r := regexp.MustCompile(fmt.Sprintf(`<%s.*%s="(.*?)"`, svcName, attrName))
 	m := r.FindStringSubmatch(string(source[:]))
 
 	if len(m) <= 0 {
 		errorMsg := fmt.Sprintf(
-			"No attribute [%s] found for [%s] from %s\n", attrName, svcName, source)
+			"No attribute [%s] found for [%s] from\n    %s\n", attrName, svcName, source)
 		return "", errors.New(errorMsg)
 	}
 

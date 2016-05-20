@@ -7,9 +7,21 @@ import (
 
 const sample = `
 <health-check>
-  <service2 check="pass" connections="45"/>
+  <service2 check="pass" connections="45" emptyattr=""/>
 </health-check>
 `
+
+func TestFindCheckedResultValue(t *testing.T) {
+	val, err := findAttribute([]byte(sample), "service2", "check")
+	expect(t, err, nil)
+	expect(t, val, "pass")
+}
+
+func TestFindEmptyAttributeValue(t *testing.T) {
+	val, err := findAttribute([]byte(sample), "service2", "emptyattr")
+	expect(t, err, nil)
+	expect(t, val, "")
+}
 
 func TestFindCustomAttributeValue(t *testing.T) {
 	val, err := findAttribute([]byte(sample), "service2", "connections")

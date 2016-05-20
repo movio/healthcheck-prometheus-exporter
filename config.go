@@ -30,7 +30,7 @@ func (t Tenant) String() string {
 }
 
 func readConfig() (Config, error) {
-	configFile, _ := filepath.Abs("./config.yml")
+	configFile, _ := filepath.Abs("./config.yaml")
 
 	yamlFile, err := ioutil.ReadFile(configFile)
 	if err != nil {

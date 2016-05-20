@@ -9,6 +9,8 @@ import (
 )
 
 func main() {
+	log.Println("Starting healthcheck prometheus exporter...")
+
 	config, err := readConfig()
 	if err != nil {
 		panic(err)

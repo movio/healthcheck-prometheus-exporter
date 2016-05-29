@@ -27,12 +27,13 @@ type HcService struct {
 	Gauge prometheus.Gauge
 }
 
-func newGauge(key string, tenant string, service ConfigService) prometheus.Gauge {
+func newGauge(attr string, tenant string, service ConfigService) prometheus.Gauge {
 	return prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: service.Type,
-		Subsystem: tenant,
-		Name:      key,
-		Help:      service.Help,
+		Namespace:   escape(service.Type),
+		Subsystem:   escape(service.Name),
+		Name:        escape(attr),
+		Help:        service.Help,
+		ConstLabels: prometheus.Labels{"schema": tenant},
 	})
 }
 
@@ -61,8 +62,8 @@ func newHcGauge(tenant Tenant, config Config) HcGauge {
 }
 
 func newService(svc ConfigService, attr string, tenant string) HcService {
-	key := strings.Replace(fmt.Sprintf("%s_%s", svc.Name, attr), "-", "_", -1)
-	return HcService{key, svc.Name, svc.Type, attr, newGauge(key, tenant, svc)}
+	key := fmt.Sprintf("%s_%s", svc.Name, attr)
+	return HcService{key, svc.Name, svc.Type, attr, newGauge(attr, tenant, svc)}
 }
 
 func updateAll(hcs []HcGauge) {
@@ -147,4 +148,8 @@ func findAttribute(source []byte, svcName string, attrName string) (string, erro
 	}
 
 	return m[1], nil
+}
+
+func escape(value string) string {
+	return strings.Replace(value, "-", "_", -1)
 }

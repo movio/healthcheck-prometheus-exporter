@@ -123,6 +123,8 @@ func getUpdateValue(svcName string, attrName string, result XmlService, body []b
 		value = 0
 	case "fail":
 		value = 1
+	case "failed":
+		value = 1
 	case "":
 		return 0, fmt.Errorf(
 			"No value found for attribute [%s]: %s", attrName, attrVal)

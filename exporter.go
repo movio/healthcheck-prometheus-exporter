@@ -138,7 +138,7 @@ func getUpdateValue(svcName string, attrName string, result XmlService, body []b
 }
 
 func findAttribute(source []byte, svcName string, attrName string) (string, error) {
-	r := regexp.MustCompile(fmt.Sprintf(`<%s.*%s="(.*?)"`, svcName, attrName))
+	r := regexp.MustCompile(fmt.Sprintf(`<%s.*?%s="(.*?)"`, svcName, attrName))
 	m := r.FindStringSubmatch(string(source[:]))
 
 	if len(m) <= 0 {

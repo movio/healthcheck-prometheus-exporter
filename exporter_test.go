@@ -11,10 +11,25 @@ const sample = `
 </health-check>
 `
 
+const sampleFail = `
+<?xml version="1.0" encoding="UTF-8"?>
+<health-check>
+  <service1 check="fail" foo="pass" />
+  <cron check="fail" abc="259548" dfg="" />
+  <service2 check="pass" response="200" />
+</health-check>
+`
+
 func TestFindCheckedResultValue(t *testing.T) {
 	val, err := findAttribute([]byte(sample), "service2", "check")
 	expect(t, err, nil)
 	expect(t, val, "pass")
+}
+
+func TestFindCheckedResultValueFail(t *testing.T) {
+	val, err := findAttribute([]byte(sampleFail), "cron", "check")
+	expect(t, err, nil)
+	expect(t, val, "fail")
 }
 
 func TestFindEmptyAttributeValue(t *testing.T) {
